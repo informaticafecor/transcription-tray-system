@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Credentials
+credentials/*.json
+!credentials/.gitkeep
+
+# Build
+dist/
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Prisma
+prisma/migrations/*_migration_lock.toml

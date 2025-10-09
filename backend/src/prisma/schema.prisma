@@ -1,0 +1,64 @@
+// backend/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AudioStatus {
+  PENDING
+  PROCESSING
+  DONE
+  ERROR
+}
+
+model Audio {
+  id                 String      @id @default(uuid())
+  userId             String      @map("user_id")
+  filename           String
+  originalFilename   String      @map("original_filename")
+  driveFileId        String?     @map("drive_file_id")
+  driveFileUrl       String?     @map("drive_file_url")
+  status             AudioStatus @default(PENDING)
+  transcriptionText  String?     @map("transcription_text") @db.Text
+  errorMessage       String?     @map("error_message") @db.Text
+  fileSize           Int?        @map("file_size")
+  duration           Float?
+  mimeType           String?     @map("mime_type")
+  processingStarted  DateTime?   @map("processing_started")
+  processingFinished DateTime?   @map("processing_finished")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("audios")
+}
+
+model UploadQuota {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  date      DateTime @default(now()) @db.Date
+  count     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, date])
+  @@map("upload_quotas")
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     String
+  message   String   @db.Text
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([level])
+  @@index([createdAt])
+  @@map("system_logs")
+}
