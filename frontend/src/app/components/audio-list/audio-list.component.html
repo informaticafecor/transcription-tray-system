@@ -1,0 +1,115 @@
+<!-- src/app/components/audio-list/audio-list.component.html -->
+<div class="audio-list-container">
+  <div class="list-header">
+    <h3>{{ isAdminView ? 'Todas las Transcripciones' : 'Mis Transcripciones' }}</h3>
+    <button class="btn btn-refresh" (click)="loadAudios()" [disabled]="loading">
+      Actualizar
+    </button>
+  </div>
+
+  <div *ngIf="loading && audios.length === 0" class="loading">
+    <div class="spinner"></div>
+    <p>Cargando audios...</p>
+  </div>
+
+  <div *ngIf="!loading && audios.length === 0" class="empty-state">
+    <p>No hay audios disponibles</p>
+  </div>
+
+  <div class="audio-grid" *ngIf="audios.length > 0">
+    <div *ngFor="let audio of audios" class="audio-card">
+      <div class="card-header">
+        <h4>{{ audio.originalFilename }}</h4>
+        <span class="status-badge" [ngClass]="getStatusClass(audio.status)">
+          {{ getStatusLabel(audio.status) }}
+        </span>
+      </div>
+
+      <div class="card-body">
+        <p class="audio-date">{{ formatDate(audio.createdAt) }}</p>
+        
+        <div *ngIf="audio.status === AudioStatus.PROCESSING" class="processing-indicator">
+          <div class="spinner-small"></div>
+          <span>Transcribiendo...</span>
+        </div>
+
+        <div *ngIf="audio.status === AudioStatus.DONE && audio.transcriptionText" class="transcription-preview">
+          <p>{{ audio.transcriptionText.substring(0, 150) }}...</p>
+        </div>
+
+        <div *ngIf="audio.status === AudioStatus.ERROR" class="error-message">
+          <p>{{ audio.errorMessage || 'Error desconocido' }}</p>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <button class="btn btn-sm btn-primary" (click)="selectAudio(audio)">
+          Ver Detalles
+        </button>
+        <button class="btn btn-sm btn-danger" (click)="deleteAudio(audio)">
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para ver detalles -->
+  <div *ngIf="selectedAudio" class="modal-overlay" (click)="closeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ selectedAudio.originalFilename }}</h3>
+        <button class="btn-close" (click)="closeModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="detail-row">
+          <strong>Estado:</strong>
+          <span class="status-badge" [ngClass]="getStatusClass(selectedAudio.status)">
+            {{ getStatusLabel(selectedAudio.status) }}
+          </span>
+        </div>
+
+        <div class="detail-row">
+          <strong>Fecha de carga:</strong>
+          <span>{{ formatDate(selectedAudio.createdAt) }}</span>
+        </div>
+
+        <div class="detail-row" *ngIf="selectedAudio.fileSize">
+          <strong>Tamaño:</strong>
+          <span>{{ (selectedAudio.fileSize / 1024 / 1024).toFixed(2) }} MB</span>
+        </div>
+
+        <div class="detail-row" *ngIf="selectedAudio.duration">
+          <strong>Duración:</strong>
+          <span>{{ selectedAudio.duration.toFixed(2) }} segundos</span>
+        </div>
+
+        <div *ngIf="selectedAudio.status === AudioStatus.DONE && selectedAudio.transcriptionText" class="transcription-section">
+          <div class="transcription-header">
+            <strong>Transcripción:</strong>
+            <button class="btn btn-sm btn-copy" (click)="copyToClipboard(selectedAudio.transcriptionText!)">
+              Copiar
+            </button>
+          </div>
+          <div class="transcription-text">
+            {{ selectedAudio.transcriptionText }}
+          </div>
+        </div>
+
+        <div *ngIf="selectedAudio.status === AudioStatus.ERROR" class="error-section">
+          <strong>Error:</strong>
+          <p>{{ selectedAudio.errorMessage }}</p>
+        </div>
+
+        <div *ngIf="selectedAudio.status === AudioStatus.PROCESSING" class="processing-section">
+          <div class="spinner"></div>
+          <p>La transcripción está en proceso. Por favor espera...</p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>

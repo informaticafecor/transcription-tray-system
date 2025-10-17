@@ -1,0 +1,58 @@
+<!-- ============================================ -->
+<!-- src/app/pages/user-dashboard/user-dashboard.component.html -->
+<!-- ============================================ -->
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <div class="header-left">
+      <h1>Panel de Usuario</h1>
+      <p class="welcome-text">Bienvenido, {{ userName }}</p>
+    </div>
+    <div class="header-right">
+      <button class="btn btn-logout" (click)="logout()">Cerrar Sesión</button>
+    </div>
+  </header>
+
+  <div class="stats-section" *ngIf="stats">
+    <div class="stat-card">
+      <div class="stat-icon">📊</div>
+      <div class="stat-content">
+        <h3>{{ stats.audios.total }}</h3>
+        <p>Total de Audios</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-content">
+        <h3>{{ stats.audios.pending + stats.audios.processing }}</h3>
+        <p>En Proceso</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <h3>{{ stats.audios.done }}</h3>
+        <p>Completados</p>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">❌</div>
+      <div class="stat-content">
+        <h3>{{ stats.audios.error }}</h3>
+        <p>Con Errores</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="upload-section">
+      <app-upload (uploadComplete)="onUploadComplete()"></app-upload>
+    </div>
+
+    <div class="list-section">
+      <app-audio-list [isAdminView]="false"></app-audio-list>
+    </div>
+  </div>
+</div>

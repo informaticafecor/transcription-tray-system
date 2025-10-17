@@ -1,6 +1,4 @@
-// ============================================
-// src/controllers/audio.controller.ts
-// ============================================
+// src/controllers/audio.controller.ts - CORREGIDO
 import { Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { PrismaClient, AudioStatus } from '@prisma/client';
@@ -16,17 +14,29 @@ const prisma = new PrismaClient();
 export class AudioController {
   async uploadAudio(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      logger.info('=== INICIO UPLOAD AUDIO ===');
+      
       const userId = req.user!.id;
       const file = req.file;
 
+      logger.info('Usuario:', { userId });
+      logger.info('Archivo recibido:', { 
+        exists: !!file,
+        name: file?.originalname,
+        size: file?.size,
+        mimetype: file?.mimetype
+      });
+
       if (!file) {
+        logger.error('No se recibió ningún archivo');
         throw new AppError('No se proporcionó ningún archivo', StatusCodes.BAD_REQUEST);
       }
 
-      // Verificar cuota diaria
+      // Verificar cuota diaria - CORREGIDO
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
+      // Buscar o crear cuota del día de HOY
       let quota = await prisma.uploadQuota.findFirst({
         where: {
           userId,
@@ -35,16 +45,38 @@ export class AudioController {
       });
 
       if (!quota) {
-        quota = await prisma.uploadQuota.create({
-          data: {
-            userId,
-            date: today,
-            count: 0,
-          },
-        });
+        // Si no existe cuota para hoy, crearla
+        try {
+          quota = await prisma.uploadQuota.create({
+            data: {
+              userId,
+              date: today,
+              count: 0,
+            },
+          });
+          logger.info('Cuota creada para usuario de hoy');
+        } catch (createError: any) {
+          // Si falla por duplicado, intentar buscar de nuevo
+          if (createError.code === 'P2002') {
+            quota = await prisma.uploadQuota.findFirst({
+              where: {
+                userId,
+                date: today,
+              },
+            });
+            if (!quota) {
+              throw new Error('No se pudo obtener la cuota del usuario');
+            }
+          } else {
+            throw createError;
+          }
+        }
       }
 
+      logger.info('Cuota actual:', { count: quota.count, limit: config.limits.maxDailyUploads });
+
       if (quota.count >= config.limits.maxDailyUploads) {
+        logger.warn('Límite diario alcanzado');
         throw new AppError(
           `Límite diario alcanzado (${config.limits.maxDailyUploads} archivos)`,
           StatusCodes.TOO_MANY_REQUESTS
@@ -55,11 +87,15 @@ export class AudioController {
       const timestamp = Date.now();
       const filename = `audio_${userId}_${timestamp}_${file.originalname}`;
       
+      logger.info('Subiendo a Google Drive...', { filename });
+      
       const { fileId, webViewLink } = await driveService.uploadFile(
         file.buffer,
         filename,
         file.mimetype
       );
+
+      logger.info('Archivo subido a Drive', { fileId, webViewLink });
 
       // Crear registro en base de datos
       const audio = await prisma.audio.create({
@@ -75,11 +111,15 @@ export class AudioController {
         },
       });
 
+      logger.info('Registro creado en BD', { audioId: audio.id });
+
       // Actualizar cuota
       await prisma.uploadQuota.update({
         where: { id: quota.id },
         data: { count: quota.count + 1 },
       });
+
+      logger.info('Cuota actualizada');
 
       // Encolar para procesamiento
       await queueService.addAudioJob({
@@ -90,11 +130,8 @@ export class AudioController {
         filename,
       });
 
-      logger.info('Audio subido y encolado exitosamente', {
-        audioId: audio.id,
-        userId,
-        filename,
-      });
+      logger.info('Audio encolado para procesamiento');
+      logger.info('=== FIN UPLOAD AUDIO EXITOSO ===');
 
       res.status(StatusCodes.CREATED).json({
         success: true,
@@ -106,11 +143,16 @@ export class AudioController {
           createdAt: audio.createdAt,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
+      logger.error('=== ERROR EN UPLOAD AUDIO ===', {
+        message: error.message,
+        code: error.code
+      });
       next(error);
     }
   }
 
+  // Resto del código sin cambios...
   async getUserAudios(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
@@ -236,7 +278,6 @@ export class AudioController {
         throw new AppError('No tienes permiso para eliminar este audio', StatusCodes.FORBIDDEN);
       }
 
-      // Eliminar de Drive si existe
       if (audio.driveFileId) {
         try {
           await driveService.deleteFile(audio.driveFileId);
@@ -245,10 +286,8 @@ export class AudioController {
         }
       }
 
-      // Remover de cola si está pendiente
       await queueService.removeJob(id);
 
-      // Eliminar de base de datos
       await prisma.audio.delete({
         where: { id },
       });

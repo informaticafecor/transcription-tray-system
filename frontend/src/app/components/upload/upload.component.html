@@ -1,0 +1,63 @@
+<!-- src/app/components/upload/upload.component.html -->
+<div class="upload-container">
+  <h3>Subir Audio para Transcripción</h3>
+
+  <div class="upload-area">
+    <input 
+      type="file" 
+      id="fileInput"
+      accept="audio/*"
+      (change)="onFileSelected($event)"
+      [disabled]="uploading"
+      style="display: none;"
+    />
+
+    <div *ngIf="!selectedFile && !uploading" class="upload-prompt" (click)="triggerFileInput()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+      <p>Haz clic para seleccionar un archivo de audio</p>
+      <p class="upload-hint">Formatos soportados: MP3, WAV, MP4, OGG</p>
+    </div>
+
+    <div *ngIf="selectedFile && !uploading" class="file-info">
+      <p><strong>Archivo seleccionado:</strong></p>
+      <p>{{ selectedFile.name }}</p>
+      <p class="file-size">{{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
+      
+      <div class="button-group">
+        <button 
+          type="button"
+          class="btn btn-primary" 
+          (click)="uploadFile()"
+          [disabled]="uploading"
+        >
+          Subir y Transcribir
+        </button>
+        <button 
+          type="button"
+          class="btn btn-secondary" 
+          (click)="clearSelection()"
+          [disabled]="uploading"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="uploading" class="uploading">
+      <div class="spinner"></div>
+      <p>Subiendo archivo...</p>
+    </div>
+  </div>
+
+  <div *ngIf="errorMessage" class="alert alert-error">
+    {{ errorMessage }}
+  </div>
+
+  <div *ngIf="successMessage" class="alert alert-success">
+    {{ successMessage }}
+  </div>
+</div>

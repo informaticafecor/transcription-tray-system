@@ -1,6 +1,4 @@
-// ============================================
-// src/utils/logger.ts
-// ============================================
+// src/utils/logger.ts - CORREGIDO
 import winston from 'winston';
 import { config } from '../config/env';
 import path from 'path';
@@ -9,6 +7,20 @@ import fs from 'fs';
 if (!fs.existsSync(config.logging.filePath)) {
   fs.mkdirSync(config.logging.filePath, { recursive: true });
 }
+
+// Función para serializar objetos con referencias circulares
+const getCircularReplacer = () => {
+  const seen = new WeakSet();
+  return (key: string, value: any) => {
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) {
+        return '[Circular]';
+      }
+      seen.add(value);
+    }
+    return value;
+  };
+};
 
 const customFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -22,8 +34,34 @@ const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.printf(({ timestamp, level, message, ...metadata }) => {
     let msg = `${timestamp} [${level}]: ${message}`;
-    if (Object.keys(metadata).length > 0) {
-      msg += ` ${JSON.stringify(metadata)}`;
+    
+    // Manejar metadata con referencias circulares
+    const metadataKeys = Object.keys(metadata);
+    if (metadataKeys.length > 0) {
+      try {
+        const cleanMetadata: any = {};
+        for (const key of metadataKeys) {
+          if (key === 'stack') {
+            cleanMetadata[key] = metadata[key];
+          } else if (metadata[key] instanceof Error) {
+            cleanMetadata[key] = {
+              message: metadata[key].message,
+              stack: metadata[key].stack
+            };
+          } else if (typeof metadata[key] === 'object') {
+            try {
+              cleanMetadata[key] = JSON.parse(JSON.stringify(metadata[key], getCircularReplacer()));
+            } catch {
+              cleanMetadata[key] = String(metadata[key]);
+            }
+          } else {
+            cleanMetadata[key] = metadata[key];
+          }
+        }
+        msg += ` ${JSON.stringify(cleanMetadata)}`;
+      } catch (error) {
+        msg += ' [Error serializing metadata]';
+      }
     }
     return msg;
   })
