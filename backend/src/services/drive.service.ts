@@ -35,7 +35,10 @@ class DriveService {
 
       const auth = new google.auth.GoogleAuth({
         keyFile: credentialsPath,
-        scopes: ['https://www.googleapis.com/auth/drive.file'],
+        scopes: [
+          'https://www.googleapis.com/auth/drive.file',
+          'https://www.googleapis.com/auth/drive' // Agregar este scope completo
+        ],
       });
 
       this.drive = google.drive({ version: 'v3', auth });
@@ -65,10 +68,10 @@ class DriveService {
         folderId: config.google.driveFolderId 
       });
 
-      // Metadata del archivo
+      // Metadata del archivo - SIMPLIFICADO
       const fileMetadata: drive_v3.Schema$File = {
         name: filename,
-        parents: [config.google.driveFolderId], // La carpeta que compartiste
+        parents: [config.google.driveFolderId]
       };
 
       const media = {
@@ -76,16 +79,31 @@ class DriveService {
         body: Readable.from(buffer),
       };
 
-      // Subir el archivo
+      // Subir el archivo - SIN supportsAllDrives
       const response = await this.drive.files.create({
         requestBody: fileMetadata,
         media,
-        fields: 'id, webViewLink, webContentLink, name',
-        supportsAllDrives: true, // IMPORTANTE: Soporta drives compartidos
+        fields: 'id, webViewLink, webContentLink, name'
+        // REMOVIDO: supportsAllDrives: true
       });
 
       const fileId = response.data.id!;
       const webViewLink = response.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
+
+      // Opcional: Hacer el archivo público
+      try {
+        await this.drive.permissions.create({
+          fileId: fileId,
+          requestBody: {
+            type: 'anyone',
+            role: 'reader'
+          }
+        });
+        logger.info('Permisos públicos establecidos para el archivo');
+      } catch (permError) {
+        logger.warn('No se pudieron establecer permisos públicos:', permError);
+        // No es crítico, continuar
+      }
 
       logger.info('Archivo subido a Drive exitosamente', { 
         fileId, 
@@ -94,6 +112,7 @@ class DriveService {
       });
 
       return { fileId, webViewLink };
+
     } catch (error: any) {
       logger.error('Error al subir archivo a Drive:', {
         message: error.message,
@@ -104,16 +123,22 @@ class DriveService {
       
       // Mensaje de error más específico
       let errorMessage = error.message;
+      
       if (error.code === 404) {
-        errorMessage = 'Carpeta de Drive no encontrada. Verifica el GOOGLE_DRIVE_FOLDER_ID en .env';
-      } else if (error.message.includes('storage quota')) {
-        errorMessage = 'Error de cuota de almacenamiento. Asegúrate de compartir la carpeta con la Service Account';
+        errorMessage = 'Carpeta no encontrada. Verifica que el ID de carpeta sea correcto y esté compartida con la cuenta de servicio.';
+      } else if (error.code === 403) {
+        if (error.message.includes('storage quota')) {
+          errorMessage = 'La carpeta debe estar compartida con permisos de Editor para la cuenta de servicio: transcription-service@proyectobandeja.iam.gserviceaccount.com';
+        } else {
+          errorMessage = 'Sin permisos. Verifica que la carpeta esté compartida con la cuenta de servicio con rol Editor.';
+        }
       }
       
       throw new Error(`Error al subir archivo a Google Drive: ${errorMessage}`);
     }
   }
 
+  // También actualiza el método deleteFile
   async deleteFile(fileId: string): Promise<void> {
     if (!this.initialized || !this.drive) {
       logger.warn('Intento de eliminar archivo sin Google Drive inicializado');
@@ -122,8 +147,8 @@ class DriveService {
 
     try {
       await this.drive.files.delete({ 
-        fileId,
-        supportsAllDrives: true 
+        fileId
+        // REMOVIDO: supportsAllDrives: true
       });
       logger.info('Archivo eliminado de Drive', { fileId });
     } catch (error: any) {
@@ -134,6 +159,7 @@ class DriveService {
     }
   }
 
+  // Y el método getFileMetadata
   async getFileMetadata(fileId: string): Promise<drive_v3.Schema$File | null> {
     if (!this.initialized || !this.drive) {
       return null;
@@ -142,8 +168,8 @@ class DriveService {
     try {
       const response = await this.drive.files.get({
         fileId,
-        fields: 'id, name, mimeType, size, webViewLink',
-        supportsAllDrives: true
+        fields: 'id, name, mimeType, size, webViewLink'
+        // REMOVIDO: supportsAllDrives: true
       });
       return response.data;
     } catch (error: any) {

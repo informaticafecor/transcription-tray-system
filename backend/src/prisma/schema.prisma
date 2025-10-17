@@ -41,14 +41,16 @@ model Audio {
 
 model UploadQuota {
   id        String   @id @default(uuid())
-  userId    String   @unique @map("user_id")
+  userId    String   @map("user_id")  // REMOVIDO @unique
   date      DateTime @default(now()) @db.Date
   count     Int      @default(0)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@index([userId, date])
-  @@map("upload_quotas")
+  @@unique([userId, date])  // Solo este unique compuesto
+  @@index([userId])
+  @@index([date])
+  @@map("upload_quotas")  // Opcional: para consistencia con tus otras tablas
 }
 
 model SystemLog {

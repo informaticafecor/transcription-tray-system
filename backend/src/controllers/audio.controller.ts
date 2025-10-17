@@ -1,3 +1,4 @@
+
 // src/controllers/audio.controller.ts - CORREGIDO
 import { Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
@@ -12,6 +13,8 @@ import { config } from '../config/env';
 const prisma = new PrismaClient();
 
 export class AudioController {
+
+  // src/controllers/audio.controller.ts - VERSIÓN CORREGIDA SIN UPSERT
   async uploadAudio(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       logger.info('=== INICIO UPLOAD AUDIO ===');
@@ -32,20 +35,25 @@ export class AudioController {
         throw new AppError('No se proporcionó ningún archivo', StatusCodes.BAD_REQUEST);
       }
 
-      // Verificar cuota diaria - CORREGIDO
+      // Verificar cuota diaria - VERSIÓN SIN UPSERT
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Buscar o crear cuota del día de HOY
+      // Buscar cuota existente
       let quota = await prisma.uploadQuota.findFirst({
         where: {
           userId,
-          date: today,
-        },
+          date: {
+            gte: today,
+            lt: tomorrow
+          }
+        }
       });
 
+      // Si no existe, crearla
       if (!quota) {
-        // Si no existe cuota para hoy, crearla
         try {
           quota = await prisma.uploadQuota.create({
             data: {
@@ -54,26 +62,33 @@ export class AudioController {
               count: 0,
             },
           });
-          logger.info('Cuota creada para usuario de hoy');
+          logger.info('Cuota creada para usuario');
         } catch (createError: any) {
-          // Si falla por duplicado, intentar buscar de nuevo
-          if (createError.code === 'P2002') {
-            quota = await prisma.uploadQuota.findFirst({
-              where: {
-                userId,
-                date: today,
-              },
-            });
-            if (!quota) {
-              throw new Error('No se pudo obtener la cuota del usuario');
+          // Si falla por duplicado, buscar de nuevo
+          logger.warn('Error al crear cuota, buscando de nuevo...', { error: createError.message });
+          
+          quota = await prisma.uploadQuota.findFirst({
+            where: {
+              userId,
+              date: {
+                gte: today,
+                lt: tomorrow
+              }
             }
-          } else {
-            throw createError;
+          });
+          
+          if (!quota) {
+            logger.error('No se pudo crear ni encontrar la cuota');
+            throw new AppError('Error al verificar cuota diaria', StatusCodes.INTERNAL_SERVER_ERROR);
           }
         }
       }
 
-      logger.info('Cuota actual:', { count: quota.count, limit: config.limits.maxDailyUploads });
+      logger.info('Cuota actual:', { 
+        quotaId: quota.id,
+        count: quota.count, 
+        limit: config.limits.maxDailyUploads 
+      });
 
       if (quota.count >= config.limits.maxDailyUploads) {
         logger.warn('Límite diario alcanzado');
@@ -89,69 +104,90 @@ export class AudioController {
       
       logger.info('Subiendo a Google Drive...', { filename });
       
-      const { fileId, webViewLink } = await driveService.uploadFile(
-        file.buffer,
-        filename,
-        file.mimetype
-      );
-
-      logger.info('Archivo subido a Drive', { fileId, webViewLink });
-
-      // Crear registro en base de datos
-      const audio = await prisma.audio.create({
-        data: {
-          userId,
+      let driveResult;
+      try {
+        driveResult = await driveService.uploadFile(
+          file.buffer,
           filename,
-          originalFilename: file.originalname,
-          driveFileId: fileId,
-          driveFileUrl: webViewLink,
-          status: AudioStatus.PENDING,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-        },
+          file.mimetype
+        );
+        logger.info('Archivo subido a Drive', driveResult);
+      } catch (driveError: any) {
+        logger.error('Error al subir a Drive:', { error: driveError.message });
+        throw new AppError('Error al subir archivo a Google Drive', StatusCodes.INTERNAL_SERVER_ERROR);
+      }
+
+      const { fileId, webViewLink } = driveResult;
+
+      // Usar transacción para crear audio y actualizar cuota
+      const result = await prisma.$transaction(async (tx) => {
+        // Crear el registro de audio
+        const audio = await tx.audio.create({
+          data: {
+            userId,
+            filename,
+            originalFilename: file.originalname,
+            driveFileId: fileId,
+            driveFileUrl: webViewLink,
+            status: AudioStatus.PENDING,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+          },
+        });
+
+        // Actualizar la cuota
+        await tx.uploadQuota.update({
+          where: { id: quota!.id },
+          data: { 
+            count: quota!.count + 1  // Incrementar manualmente
+          },
+        });
+
+        return audio;
       });
 
-      logger.info('Registro creado en BD', { audioId: audio.id });
-
-      // Actualizar cuota
-      await prisma.uploadQuota.update({
-        where: { id: quota.id },
-        data: { count: quota.count + 1 },
-      });
-
-      logger.info('Cuota actualizada');
+      logger.info('Registro creado en BD y cuota actualizada', { audioId: result.id });
 
       // Encolar para procesamiento
-      await queueService.addAudioJob({
-        audioId: audio.id,
-        userId,
-        driveFileId: fileId,
-        driveFileUrl: webViewLink,
-        filename,
-      });
+      try {
+        await queueService.addAudioJob({
+          audioId: result.id,
+          userId,
+          driveFileId: fileId,
+          driveFileUrl: webViewLink,
+          filename,
+        });
+        logger.info('Audio encolado para procesamiento');
+      } catch (queueError: any) {
+        logger.error('Error al encolar audio:', { error: queueError.message });
+        // No es crítico, el audio ya está guardado
+      }
 
-      logger.info('Audio encolado para procesamiento');
       logger.info('=== FIN UPLOAD AUDIO EXITOSO ===');
 
       res.status(StatusCodes.CREATED).json({
         success: true,
         message: 'Audio subido exitosamente y encolado para transcripción',
         data: {
-          id: audio.id,
-          filename: audio.originalFilename,
-          status: audio.status,
-          createdAt: audio.createdAt,
+          id: result.id,
+          filename: result.originalFilename,
+          status: result.status,
+          createdAt: result.createdAt,
         },
       });
+      
     } catch (error: any) {
       logger.error('=== ERROR EN UPLOAD AUDIO ===', {
         message: error.message,
-        code: error.code
+        code: error.code,
+        stack: error.stack
       });
       next(error);
     }
   }
 
+
+  ///
   // Resto del código sin cambios...
   async getUserAudios(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
