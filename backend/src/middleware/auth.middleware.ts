@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
 
 export const authMiddleware = async (
   req: AuthRequest,
-  res: Response,
+  res: Response,  
   next: NextFunction
 ): Promise<void> => {
   try {
@@ -21,9 +21,9 @@ export const authMiddleware = async (
     // Esto permite que el sistema funcione sin el sistema de autenticación externo
     
     req.user = {
-      id: 'hola1',
+      id: 'hola5',
       email: 'informaticafecor@gmail.com',
-      role: 'user',
+      role: 'admin',
     };
 
     logger.debug('Usuario de prueba autenticado correctamente');

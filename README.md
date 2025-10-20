@@ -179,7 +179,7 @@ JWT_SECRET=your-jwt-secret-key
 
 # Límites
 MAX_DAILY_UPLOADS=5
-MAX_FILE_SIZE_MB=50
+MAX_FILE_SIZE_MB=1500
 ```
 
 ### Configurar Google Drive API
@@ -202,7 +202,7 @@ export const environment = {
   apiUrl: 'http://localhost:3000/api/v1',
   authApiUrl: 'http://localhost:3001/api/auth',
   pollingInterval: 5000,
-  maxFileSize: 50 * 1024 * 1024,
+  maxFileSize: 1500 * 1024 * 1024,
 };
 ```
 

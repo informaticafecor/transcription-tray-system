@@ -14,8 +14,16 @@ const envSchema = Joi.object({
   REDIS_URL: Joi.string().required(),
   REDIS_HOST: Joi.string().default('localhost'),
   REDIS_PORT: Joi.number().default(6379),
-  GOOGLE_SERVICE_ACCOUNT_JSON_PATH: Joi.string().required(),
+
   GOOGLE_DRIVE_FOLDER_ID: Joi.string().required(),
+
+  // Actualiza estos campos de Google:
+  GOOGLE_CLIENT_ID: Joi.string().required(),
+  GOOGLE_CLIENT_SECRET: Joi.string().required(), 
+  GOOGLE_REFRESH_TOKEN: Joi.string().required(),
+
+
+
   TRANSCRIPTOR_URL: Joi.string().uri().required(),
   AUTH_VERIFY_URL: Joi.string().uri().required(),
   FRONTEND_BASE_URL: Joi.string().uri().required(),
@@ -57,6 +65,12 @@ export const config = {
   google: {
     serviceAccountPath: envVars.GOOGLE_SERVICE_ACCOUNT_JSON_PATH as string,
     driveFolderId: envVars.GOOGLE_DRIVE_FOLDER_ID as string,
+
+    clientId: envVars.GOOGLE_CLIENT_ID as string,
+    clientSecret: envVars.GOOGLE_CLIENT_SECRET as string,
+    refreshToken: envVars.GOOGLE_REFRESH_TOKEN as string,
+
+
   },
   services: {
     transcriptorUrl: envVars.TRANSCRIPTOR_URL as string,

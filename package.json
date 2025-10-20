@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "bull-board": "^1.7.2"
+  }
+}

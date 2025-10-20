@@ -21,6 +21,9 @@ const fileFilter = (
   }
 };
 
+// Agrega este console.log temporalmente
+console.log('Límite de archivo configurado:', config.limits.maxFileSizeMB, 'MB');
+
 export const uploadMiddleware = multer({
   storage,
   fileFilter,
