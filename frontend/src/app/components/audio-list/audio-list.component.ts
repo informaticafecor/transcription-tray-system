@@ -23,7 +23,12 @@ export class AudioListComponent implements OnInit, OnDestroy {
   loading = false;
   AudioStatus = AudioStatus;
   selectedAudio: Audio | null = null;
+
   private pollingSubscription?: Subscription;
+  
+  // ========== CAMBIO: Aumentar intervalo de polling de 5s a 10s ==========
+  private pollingInterval = interval(10000); // 10 segundos (antes era 5000)
+  // =======================================================================
 
   constructor(private audioService: AudioService) {}
 
@@ -38,7 +43,6 @@ export class AudioListComponent implements OnInit, OnDestroy {
 
   loadAudios(): void {
     this.loading = true;
-
     const request$ = this.isAdminView
       ? this.audioService.getAllAudios()
       : this.audioService.getUserAudios();
@@ -56,9 +60,9 @@ export class AudioListComponent implements OnInit, OnDestroy {
   }
 
   startPolling(): void {
-    this.pollingSubscription = interval(environment.pollingInterval)
+    this.pollingSubscription = this.pollingInterval
       .pipe(
-        switchMap(() => 
+        switchMap(() =>
           this.isAdminView
             ? this.audioService.getAllAudios()
             : this.audioService.getUserAudios()
@@ -107,6 +111,52 @@ export class AudioListComponent implements OnInit, OnDestroy {
     });
   }
 
+  // ========== MÉTODO NUEVO PARA DESCARGAR WORD ==========
+  /**
+   * Descarga el archivo Word directamente desde el backend
+   */
+  downloadWord(audio: Audio): void {
+    if (!audio.driveTranscriptionFileId) {
+      alert('❌ El archivo de transcripción no está disponible');
+      return;
+    }
+
+    console.log('📥 Iniciando descarga de Word:', audio.originalFilename);
+
+    // Mostrar indicador de carga (opcional)
+    const audioId = audio.id;
+
+    // Llamar al servicio
+    this.audioService.downloadTranscription(audioId).subscribe({
+      next: (blob: Blob) => {
+        // Crear URL temporal del blob
+        const url = window.URL.createObjectURL(blob);
+
+        // Crear elemento <a> temporal para trigger la descarga
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${audio.originalFilename.replace(/\.[^/.]+$/, '')}_transcription.docx`;
+
+        // Hacer clic programáticamente
+        document.body.appendChild(link);
+        link.click();
+
+        // Limpiar
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        console.log('✅ Descarga completada');
+      },
+      error: (error) => {
+        console.error('❌ Error al descargar:', error);
+        alert('Error al descargar el archivo. Por favor intenta de nuevo.');
+      },
+    });
+  }
+
+
+  // ======================================================
+
   getStatusClass(status: AudioStatus): string {
     switch (status) {
       case AudioStatus.PENDING: return 'status-pending';
@@ -139,7 +189,10 @@ export class AudioListComponent implements OnInit, OnDestroy {
 
   copyToClipboard(text: string): void {
     navigator.clipboard.writeText(text).then(() => {
-      alert('Texto copiado al portapapeles');
+      alert('✅ Texto copiado al portapapeles');
+    }).catch(err => {
+      console.error('❌ Error al copiar:', err);
+      alert('Error al copiar el texto');
     });
   }
 }

@@ -31,4 +31,7 @@ router.get('/admin/audios', authMiddleware, adminMiddleware, audioController.get
 // Callback (no requiere autenticación, usa secret)
 router.post('/callback/transcription', callbackController.handleTranscriptionCallback);
 
-export default router;
+// Descargar transcripción
+router.get('/audios/:id/download',authMiddleware, audioController.downloadTranscription);
+
+export default router;  

@@ -1,5 +1,5 @@
 // ============================================
-// src/controllers/callback.controller.ts
+// src/controllers/callback.controller.ts - COMPLETO ACTUALIZADO
 // ============================================
 import { Request, Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
@@ -19,18 +19,35 @@ export class CallbackController {
     try {
       // Verificar secret del callback
       const callbackSecret = req.headers['x-callback-secret'] || req.body.callback_secret;
-
+      
       if (callbackSecret !== config.callback.secret) {
         throw new AppError('Callback no autorizado', StatusCodes.UNAUTHORIZED);
       }
 
+      // ========== EXTRAER DATOS DEL BODY ==========
       const {
         audio_id,
         status,
         transcription_text,
+        transcription_file_id,    // ✅ ID del Word en Drive
+        transcription_file_url,   // ✅ URL del Word en Drive
         error_message,
         duration,
       } = req.body;
+      // ============================================
+
+      // ========== LOG TEMPORAL PARA DEBUG ==========
+      logger.info('📥 Datos recibidos en callback:', {
+        audio_id,
+        status,
+        hasText: !!transcription_text,
+        textLength: transcription_text?.length || 0,
+        hasFileId: !!transcription_file_id,
+        hasFileUrl: !!transcription_file_url,
+        transcription_file_id,
+        transcription_file_url,
+      });
+      // ============================================
 
       if (!audio_id) {
         throw new AppError('audio_id es requerido', StatusCodes.BAD_REQUEST);
@@ -55,23 +72,39 @@ export class CallbackController {
         newStatus = AudioStatus.PROCESSING;
       }
 
-      // Actualizar el registro
+      // ========== PREPARAR DATOS PARA ACTUALIZAR ==========
       const updateData: any = {
         status: newStatus,
         updatedAt: new Date(),
       };
 
+      // Si completó exitosamente
       if (newStatus === AudioStatus.DONE) {
         updateData.transcriptionText = transcription_text;
         updateData.processingFinished = new Date();
-        if (duration) updateData.duration = parseFloat(duration);
+        
+        // ========== GUARDAR CAMPOS DEL WORD (camelCase) ==========
+        if (transcription_file_id) {
+          updateData.driveTranscriptionFileId = transcription_file_id;
+        }
+        if (transcription_file_url) {
+          updateData.driveTranscriptionFileUrl = transcription_file_url;
+        }
+        // =========================================================
+        
+        if (duration) {
+          updateData.duration = parseFloat(duration);
+        }
       }
 
+      // Si hubo error
       if (newStatus === AudioStatus.ERROR) {
         updateData.errorMessage = error_message || 'Error desconocido en la transcripción';
         updateData.processingFinished = new Date();
       }
+      // ====================================================
 
+      // Actualizar en la base de datos
       await prisma.audio.update({
         where: { id: audio_id },
         data: updateData,
@@ -81,6 +114,7 @@ export class CallbackController {
         audioId: audio_id,
         status: newStatus,
         hasTranscription: !!transcription_text,
+        hasTranscriptionFile: !!transcription_file_id,
       });
 
       res.status(StatusCodes.OK).json({

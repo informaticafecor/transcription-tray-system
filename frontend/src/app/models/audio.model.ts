@@ -8,7 +8,7 @@ export enum AudioStatus {
   ERROR = 'ERROR'
 }
 
-export interface Audio {
+/*export interface Audio {
   id: string;
   userId?: string;
   filename: string;
@@ -22,6 +22,28 @@ export interface Audio {
   updatedAt: Date;
   processingStarted?: Date;
   processingFinished?: Date;
+}*/
+
+export interface Audio {
+  id: string;
+  filename: string;
+  originalFilename: string;
+  //status: 'PENDING' | 'PROCESSING' | 'DONE' | 'ERROR';
+  status: AudioStatus;  // ✅ CAMBIO: Usar el enum en lugar de string literal
+  transcriptionText?: string;
+  
+  // ========== CAMPOS NUEVOS ==========
+  driveTranscriptionFileId?: string;
+  driveTranscriptionFileUrl?: string;
+  // ===================================
+  
+  errorMessage?: string;
+  fileSize?: number;
+  duration?: number;
+  createdAt: string;
+  updatedAt: string;
+  processingStarted?: string;
+  processingFinished?: string;
 }
 
 export interface AudioUploadResponse {

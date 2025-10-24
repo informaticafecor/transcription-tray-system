@@ -24,6 +24,10 @@ model Audio {
   driveFileUrl       String?     @map("drive_file_url")
   status             AudioStatus @default(PENDING)
   transcriptionText  String?     @map("transcription_text") @db.Text
+  
+  driveTranscriptionFileId String? @map("drive_transcription_file_id")  // ← NUEVO
+  driveTranscriptionFileUrl String? @map("drive_transcription_file_url") // ← NUEVO
+
   errorMessage       String?     @map("error_message") @db.Text
   fileSize           Int?        @map("file_size")
   duration           Float?

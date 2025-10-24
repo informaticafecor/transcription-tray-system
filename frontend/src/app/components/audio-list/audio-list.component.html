@@ -27,7 +27,7 @@
 
       <div class="card-body">
         <p class="audio-date">{{ formatDate(audio.createdAt) }}</p>
-        
+
         <div *ngIf="audio.status === AudioStatus.PROCESSING" class="processing-indicator">
           <div class="spinner-small"></div>
           <span>Transcribiendo...</span>
@@ -84,17 +84,34 @@
           <span>{{ selectedAudio.duration.toFixed(2) }} segundos</span>
         </div>
 
-        <div *ngIf="selectedAudio.status === AudioStatus.DONE && selectedAudio.transcriptionText" class="transcription-section">
+        <!-- ========== SECCIÓN DE TRANSCRIPCIÓN CON BOTÓN DE DESCARGA ========== -->
+        <!-- ========== NUEVA VERSIÓN: SOLO BOTÓN DE WORD ========== -->
+        <!-- ========== NUEVA VERSIÓN: SOLO BOTÓN DE WORD ========== -->
+        <div *ngIf="selectedAudio.status === AudioStatus.DONE" class="transcription-section">
           <div class="transcription-header">
-            <strong>Transcripción:</strong>
-            <button class="btn btn-sm btn-copy" (click)="copyToClipboard(selectedAudio.transcriptionText!)">
-              Copiar
-            </button>
+            <strong>Documento de Transcripción:</strong>
           </div>
-          <div class="transcription-text">
-            {{ selectedAudio.transcriptionText }}
+          
+          <!-- Botón de descarga del Word -->
+          <div class="download-section" *ngIf="selectedAudio.driveTranscriptionFileId">
+            <button 
+              class="btn btn-primary btn-download-large"
+              (click)="downloadWord(selectedAudio)"
+              title="Descargar documento Word">
+              <i class="fas fa-download"></i> Descargar Transcripción (Word)
+            </button>
+            <p class="download-info">
+              <i class="fas fa-info-circle"></i> El documento contiene la transcripción completa con formato.
+            </p>
+          </div>
+          
+          <!-- Mensaje si no hay archivo disponible -->
+          <div class="no-file-message" *ngIf="!selectedAudio.driveTranscriptionFileId">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>El archivo de transcripción no está disponible.</p>
           </div>
         </div>
+        <!-- ======================================================= -->
 
         <div *ngIf="selectedAudio.status === AudioStatus.ERROR" class="error-section">
           <strong>Error:</strong>

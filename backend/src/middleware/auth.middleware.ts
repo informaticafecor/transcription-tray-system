@@ -21,9 +21,9 @@ export const authMiddleware = async (
     // Esto permite que el sistema funcione sin el sistema de autenticación externo
     
     req.user = {
-      id: 'hola5',
-      email: 'informaticafecor@gmail.com',
-      role: 'admin',
+      id: 'hola9',
+      email: 'informecor@gmail.com',
+      role: 'user',
     };
 
     logger.debug('Usuario de prueba autenticado correctamente');

@@ -1,4 +1,4 @@
-// src/services/drive.service.ts - VERSIÓN OAUTH2
+// src/services/drive.service.ts - VERSIÓN OAUTH2 CORREGIDA
 import { google, drive_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../config/env';
@@ -59,6 +59,7 @@ class DriveService {
       const response = await this.drive!.about.get({
         fields: 'storageQuota, user'
       });
+      
       logger.info('Conexión verificada con Drive', {
         user: response.data.user?.emailAddress,
         quotaUsed: response.data.storageQuota?.usage,
@@ -88,7 +89,7 @@ class DriveService {
       // Metadata del archivo
       const fileMetadata: drive_v3.Schema$File = {
         name: filename,
-        parents: [config.google.driveFolderId] // Ahora SÍ funcionará con tu carpeta
+        parents: [config.google.driveFolderId]
       };
 
       const media = {
@@ -96,7 +97,7 @@ class DriveService {
         body: Readable.from(buffer),
       };
 
-      // Subir el archivo - ahora como TU usuario
+      // Subir el archivo
       const response = await this.drive.files.create({
         requestBody: fileMetadata,
         media,
@@ -106,20 +107,6 @@ class DriveService {
       const fileId = response.data.id!;
       const webViewLink = response.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
 
-      // Opcional: Hacer el archivo público
-      try {
-        await this.drive.permissions.create({
-          fileId: fileId,
-          requestBody: {
-            type: 'anyone',
-            role: 'reader'
-          }
-        });
-        logger.info('Permisos públicos establecidos');
-      } catch (permError) {
-        logger.warn('No se pudieron establecer permisos públicos:', permError);
-      }
-
       logger.info('Archivo subido exitosamente con OAuth2', { 
         fileId, 
         filename,
@@ -128,7 +115,6 @@ class DriveService {
       });
 
       return { fileId, webViewLink };
-
     } catch (error: any) {
       logger.error('Error al subir archivo:', {
         message: error.message,
@@ -207,6 +193,65 @@ class DriveService {
     } catch (error: any) {
       logger.error('Error al listar archivos:', error.message);
       return [];
+    }
+  }
+
+  /**
+   * Descarga un archivo de Google Drive como Buffer
+   * @param fileId ID del archivo en Drive
+   * @returns Buffer del archivo
+   */
+  async downloadFileBuffer(fileId: string): Promise<Buffer> {
+    try {
+      // ========== VALIDACIÓN CORREGIDA ==========
+      if (!this.initialized || !this.drive) {
+        throw new Error('Google Drive service no está inicializado');
+      }
+      // ==========================================
+
+      logger.info('Descargando archivo desde Drive', { fileId });
+
+      const response = await this.drive.files.get(
+        {
+          fileId: fileId,
+          alt: 'media', // Importante: obtener el contenido, no metadata
+        },
+        {
+          responseType: 'arraybuffer', // Recibir como array buffer
+        }
+      );
+
+      const buffer = Buffer.from(response.data as ArrayBuffer);
+
+      logger.info('Archivo descargado exitosamente desde Drive', {
+        fileId,
+        size: buffer.length
+      });
+
+      return buffer;
+    } catch (error: any) {
+      logger.error('Error al descargar archivo de Drive:', {
+        fileId,
+        error: error.message,
+        code: error.code
+      });
+
+      // Si el token expiró, intentar refrescar
+      if (error.code === 401 && this.oauth2Client) {
+        logger.info('Token expirado al descargar, intentando refrescar...');
+        try {
+          const { credentials } = await this.oauth2Client.refreshAccessToken();
+          this.oauth2Client.setCredentials(credentials);
+          logger.info('Token refrescado, reintentando descarga...');
+          
+          // Reintentar descarga
+          return this.downloadFileBuffer(fileId);
+        } catch (refreshError) {
+          logger.error('Error al refrescar token durante descarga:', refreshError);
+        }
+      }
+
+      throw new Error(`Error al descargar archivo: ${error.message}`);
     }
   }
 }

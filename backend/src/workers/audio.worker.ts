@@ -1,5 +1,5 @@
 // ============================================
-// src/workers/audio.worker.ts
+// src/workers/audio.worker.ts - ACTUALIZADO
 // ============================================
 import { Worker, Job } from 'bullmq';
 import { PrismaClient, AudioStatus } from '@prisma/client';
@@ -18,8 +18,8 @@ const connection = {
 const worker = new Worker<AudioJobData>(
   config.queue.name,
   async (job: Job<AudioJobData>) => {
-    const { audioId, userId, driveFileUrl, filename } = job.data;
-
+    const { audioId, userId, driveFileId, driveFileUrl, filename } = job.data; // driveFileId es lo importante
+    
     logger.info('Procesando audio desde worker', { jobId: job.id, audioId });
 
     try {
@@ -35,14 +35,16 @@ const worker = new Worker<AudioJobData>(
       // Construir callback URL
       const callbackUrl = `${config.frontend.baseUrl.replace(/:\d+$/, ':3000')}${config.callback.path}`;
 
-      // Enviar solicitud al sistema de transcripción
+      // ========== ENVIAR file_id EN LUGAR DE file_url ==========
       const response = await transcriptorService.requestTranscription({
         audioId,
         userId,
-        fileUrl: driveFileUrl,
+        driveFileId,    // CAMBIO: Enviamos el ID del archivo
+        driveFileUrl,   // Lo enviamos también por compatibilidad (opcional)
         filename,
         callbackUrl,
       });
+      // =========================================================
 
       if (!response.success) {
         throw new Error(response.message || 'Error al solicitar transcripción');
@@ -86,7 +88,7 @@ const worker = new Worker<AudioJobData>(
   }
 );
 
-// Event listeners
+// Event listeners (sin cambios)
 worker.on('completed', (job) => {
   logger.info('Worker completó el job exitosamente', {
     jobId: job.id,

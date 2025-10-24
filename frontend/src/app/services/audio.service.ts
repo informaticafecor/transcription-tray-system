@@ -54,7 +54,7 @@ export class AudioService {
     if (userId) params = params.set('userId', userId);
 
     return this.http.get<AudioListResponse>(`${this.apiUrl}/admin/audios`, { params });
-  }
+  }                             
 
   getAudioById(id: string): Observable<{ success: boolean; data: Audio }> {
     return this.http.get<{ success: boolean; data: Audio }>(`${this.apiUrl}/audios/${id}`);
@@ -67,4 +67,17 @@ export class AudioService {
   getStats(): Observable<StatsResponse> {
     return this.http.get<StatsResponse>(`${this.apiUrl}/stats`);
   }
+
+  /**
+   * Descarga el archivo Word de transcripción directamente
+   * @param id ID del audio
+   * @returns Observable con el archivo como Blob
+   */
+  downloadTranscription(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/audios/${id}/download`, {
+      responseType: 'blob', // Importante: recibir como Blob
+    });
+}
+
+
 }
